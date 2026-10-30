@@ -1,10 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Aviso: As variáveis de ambiente do Supabase não foram configuradas no arquivo .env.local');
-}
+// Cliente padrão para o Login e uso geral
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Cliente especial para criar contas já ativadas automaticamente
+export const supabaseAdmin = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+})
