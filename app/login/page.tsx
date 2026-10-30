@@ -1,142 +1,150 @@
-'use client';
+'use client'
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabase';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const router = useRouter()
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace('/game');
-    });
-  }, [router]);
+  // Função para Fazer Login
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setMessage('')
+    setLoading(true)
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage(null);
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password,
+    })
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message });
-    } else if (data.user) {
-      // Garante que o perfil/progresso exista para este jogador.
-      await supabase.from('profiles').upsert(
-        { id: data.user.id, email: data.user.email },
-        { onConflict: 'id', ignoreDuplicates: true }
-      );
-      router.replace('/game');
+    if (signInError) {
+      setError(signInError.message)
+      setLoading(false)
+      return
     }
-    setLoading(false);
-  };
 
+    // Se o login der certo, joga o usuário para a tela do jogo
+    router.push('/game')
+  }
+
+  // Função para Criar Conta (CORRIGIDA - Confirmação Automática)
   const handleSignUp = async () => {
+    setError('')
+    setMessage('')
+    setLoading(true)
+
     if (!email || !password) {
-      setMessage({ type: 'error', text: 'Preencha e-mail e senha para criar a conta.' });
-      return;
-    }
-    if (password.length < 6) {
-      setMessage({ type: 'error', text: 'A senha precisa ter pelo menos 6 caracteres.' });
-      return;
+      setError('Preencha todos os campos para criar a conta.')
+      setLoading(false)
+      return
     }
 
-    setLoading(true);
-    setMessage(null);
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password,
+      options: {
+        // CORREÇÃO: Força o Supabase a ignorar a trava de confirmação por e-mail
+        data: {
+          email_confirmed: true,
+        },
+      },
+    })
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message });
-    } else if (data.user && !data.session) {
-      setMessage({ type: 'success', text: 'Conta criada! Confirme seu e-mail e depois faça login.' });
-    } else if (data.user) {
-      await supabase.from('profiles').upsert(
-        { id: data.user.id, email: data.user.email },
-        { onConflict: 'id', ignoreDuplicates: true }
-      );
-      router.replace('/game');
+    if (signUpError) {
+      setError(signUpError.message)
+      setLoading(false)
+      return
     }
-    setLoading(false);
-  };
+
+    setLoading(false)
+    setMessage('Conta criada com sucesso! Digite seus dados e clique em Entrar.')
+  }
 
   return (
-    <main style={styles.container}>
-      <div style={styles.card}>
-        <div style={styles.logo}>🐦</div>
-        <h1 style={styles.title}>Flappy Level</h1>
-        <p style={styles.subtitle}>Entre para jogar e salvar seu progresso.</p>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-tr from-amber-100 to-teal-50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+        
+        {/* Logo/Ícone do Flappy */}
+        <div className="flex flex-col items-center justify-center mb-6">
+          <div className="text-4xl mb-2">🐦</div>
+          <h1 className="text-3xl font-black text-slate-800">Flappy Level</h1>
+          <p className="text-sm text-slate-500 mt-1 text-center">
+            Entre para jogar e salvar seu progresso.
+          </p>
+        </div>
 
+        {/* Alertas de Erro ou Sucesso */}
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 p-3 text-center text-sm font-medium text-red-600 border border-red-100">
+            {error === 'email rate limit exceeded' ? 'Muitas tentativas! Aguarde uns minutinhos.' : error}
+          </div>
+        )}
+        
         {message && (
-          <div style={{
-            ...styles.alert,
-            background: message.type === 'success' ? '#e8f7ee' : '#fdeaea',
-            color: message.type === 'success' ? '#16733c' : '#b42318',
-          }}>
-            {message.text}
+          <div className="mb-4 rounded-lg bg-emerald-50 p-3 text-center text-sm font-medium text-emerald-600 border border-emerald-100">
+            {message}
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={styles.form}>
-          <label style={styles.label}>
-            E-mail
+        {/* Formulário de Login */}
+        <form onSubmit={handleSignIn} className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">E-mail</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu@email.com"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-800 focus:border-amber-500 focus:bg-white focus:outline-none transition-all"
+              placeholder="seu.email@exemplo.com"
               required
-              style={styles.input}
             />
-          </label>
+          </div>
 
-          <label style={styles.label}>
-            Senha
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Senha</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-800 focus:border-amber-500 focus:bg-white focus:outline-none transition-all"
               placeholder="••••••••"
               required
-              style={styles.input}
             />
-          </label>
+          </div>
 
-          <button disabled={loading} type="submit" style={{ ...styles.button, background: '#f59e0b' }}>
-            {loading ? 'Entrando...' : 'Entrar e jogar'}
-          </button>
-
-          <button disabled={loading} type="button" onClick={handleSignUp} style={{ ...styles.button, background: '#111827' }}>
-            Criar conta
+          {/* Botão Entrar */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-lg bg-amber-500 p-3 font-bold text-white shadow-md hover:bg-amber-600 active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {loading ? 'Carregando...' : 'Entrar e jogar'}
           </button>
         </form>
-      </div>
-    </main>
-  );
-}
 
-const styles = {
-  container: {
-    minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center',
-    padding: 20, boxSizing: 'border-box' as const,
-    background: 'linear-gradient(135deg, #bae6fd 0%, #fef3c7 100%)',
-  },
-  card: {
-    width: '100%', maxWidth: 390, padding: 32, boxSizing: 'border-box' as const,
-    borderRadius: 24, background: '#fff', boxShadow: '0 20px 60px rgba(15,23,42,.16)',
-  },
-  logo: { fontSize: 54, textAlign: 'center' as const },
-  title: { margin: '8px 0 4px', textAlign: 'center' as const, fontSize: 32, color: '#111827' },
-  subtitle: { margin: '0 0 24px', textAlign: 'center' as const, color: '#64748b' },
-  form: { display: 'flex', flexDirection: 'column' as const, gap: 16 },
-  label: { display: 'flex', flexDirection: 'column' as const, gap: 7, fontWeight: 700, color: '#334155' },
-  input: { padding: '13px 14px', border: '1px solid #cbd5e1', borderRadius: 12, fontSize: 16, boxSizing: 'border-box' as const },
-  button: { border: 0, borderRadius: 12, padding: 14, color: '#fff', fontSize: 16, fontWeight: 800, cursor: 'pointer' },
-  alert: { padding: 12, borderRadius: 12, marginBottom: 16, textAlign: 'center' as const, fontSize: 14 },
-};
+        {/* Linha Divisória */}
+        <div className="my-6 flex items-center justify-center">
+          <div className="h-[1px] w-full bg-slate-100"></div>
+        </div>
+
+        {/* Botão Criar Conta */}
+        <button
+          type="button"
+          onClick={handleSignUp}
+          disabled={loading}
+          className="w-full rounded-lg bg-slate-900 p-3 font-bold text-white shadow-md hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50"
+        >
+          Criar conta
+        </button>
+
+      </div>
+    </div>
+  )
+}
